@@ -1,0 +1,22 @@
+# Data
+pandas
+numpy
+
+# Topic modeling
+top2vec
+bertopic
+sentence-transformers
+umap-learn
+hdbscan
+scikit-learn
+
+# Text utilities
+langdetect
+
+# Visualization
+matplotlib
+wordcloud
+plotly
+
+# Notebook environment
+jupyterlab
