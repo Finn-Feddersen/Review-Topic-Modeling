@@ -2,13 +2,17 @@
 pandas
 numpy
 
-# Topic modeling
-top2vec
+# Topic modelling
 bertopic
 sentence-transformers
 umap-learn
 hdbscan
-scikit-learn
+
+# Classification
+scikit-learn          # Logistic Regression + Naive Bayes baselines
+transformers          # fine-tuned BERT classifier
+torch                 # BERT backend
+nltk                  # lemmatization / stopwords for the bag-of-words models
 
 # Text utilities
 langdetect
@@ -20,3 +24,6 @@ plotly
 
 # Notebook environment
 jupyterlab
+
+# Exploratory only (experiments/): Top2Vec topic modelling
+top2vec

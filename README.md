@@ -1,71 +1,78 @@
-# Review Topic Modeling
+# Topic Modelling & Rating Classification of Amazon Reviews
 
-Unsupervised **topic modeling of ~82,000 Amazon reviews of Apple products**, comparing two modern embedding-based approaches — **Top2Vec** and **BERTopic** — to discover what customers actually talk about, without any predefined categories.
+Two NLP tasks on **~50,800 Amazon reviews of Apple cell-phones & accessories**:
 
-Developed as the final project for the *Natural Language Processing* course at Copenhagen Business School (CBS).
+1. **Topic modelling** — use **BERTopic** to discover, unsupervised, what customers actually talk about.
+2. **Rating classification** — predict a review's 1–5★ rating, benchmarking **Logistic Regression** and **Naive Bayes** against a fine-tuned **BERT** classifier.
 
-## Goal
+Final examination paper for the *Natural Language Processing* course, M.Sc. Business Administration & Data Science, Copenhagen Business School (2023).
 
-Given a large, noisy corpus of product reviews, can we automatically surface coherent, interpretable themes (battery life, carrier unlocking, cases & accessories, sentiment, …) using sentence embeddings + clustering instead of classic bag-of-words LDA?
+## Research questions
+
+1. How can a company use unsupervised topic modelling (BERTopic) to understand the topics and concepts discussed in its reviews?
+2. To what extent can a supervised BERT classifier predict review ratings (1–5★) compared to Logistic Regression and Naive Bayes baselines?
 
 ## Data
 
-- **`apple.csv`** — ~82k raw Amazon reviews of Apple-branded products (standard Amazon Review Data fields: `reviewText`, `summary`, `overall`, `asin`, …).
-- **`apple_preprocessed.csv`** — the cleaned corpus produced by `00_Preprocessing.ipynb`.
+The [Amazon Review Data (2018)](https://nijianmo.github.io/amazon/) (Ni et al., UCSD). Starting from the ~10M "Cell Phones & Accessories" reviews, the pipeline filters to **Apple** products (66,089 reviews) and preprocesses down to a clean corpus of **50,813** reviews.
 
-Preprocessing (`00_Preprocessing.ipynb`): merge each review's `summary` + `reviewText` into a single `corpus` field, drop missing/empty entries, strip placeholder "Four Stars"-style summaries, remove non-English and very short (<5 word) reviews (`langdetect`), and clean whitespace.
+Preprocessing highlights (`01_text_preprocessing.ipynb`): merge `summary` + `reviewText` into one `corpus`; blank out "Five Stars"-style summaries that leak the label (24,641 rows); drop empty, non-English (`langdetect`), duplicate, and <5-word reviews. The rating distribution is heavily imbalanced (skewed to 1★ and 5★).
 
-## Methods
+## Pipeline
 
-| Notebook | Approach | Pipeline |
-|---|---|---|
-| `01_Top2Vec.ipynb` | **Top2Vec** | Universal Sentence Encoder (multilingual) embeddings → UMAP → HDBSCAN; topic vectors as cluster centroids, top words by cosine similarity. |
-| `02_BERTopic_library.ipynb` | **BERTopic (library)** | `all-MiniLM-L6-v2` embeddings → UMAP → HDBSCAN → `BERTopic` (c-TF-IDF topic words), reduced to 20 topics. |
-| `03_BERTopic_from_scratch.ipynb` | **BERTopic, reimplemented manually** | `all-MiniLM-L12-v2` → UMAP → HDBSCAN → hand-written **class-based c-TF-IDF** for topic words → iterative topic merging by cosine similarity. Demonstrates the mechanics behind the library. |
+| Notebook | Step |
+|---|---|
+| `00_data_filtering.ipynb` | Filter the 10M-row Amazon dump down to 66k Apple reviews. |
+| `01_text_preprocessing.ipynb` | Clean / filter / merge → `apple_text_preprocessed.csv` (50,813 reviews). |
+| `02_topic_modeling_bertopic.ipynb` | **BERTopic** — Sentence-BERT (`all-MiniLM-L6-v2`) → UMAP → HDBSCAN → c-TF-IDF; 30 topics (min size 100). |
+| `03_classification_lr_nb.ipynb` | **Baselines** — Logistic Regression & Naive Bayes on a bag-of-words / TF-IDF representation, tuned via randomized grid-search CV. |
+| `04_classification_bert.ipynb` | **BERT classifier** — fine-tuned `bert-base-uncased` (`BertForSequenceClassification`), 10 epochs. |
 
 ## Results
 
-The discovered topics are clean and intuitive. A few highlights:
+### Topic modelling (BERTopic)
 
-### Top2Vec topic word clouds
-Word size reflects each word's cosine similarity to the topic vector. The leading topics map neatly to real themes — handsets, charging & batteries, positive sentiment, carrier unlocking, and cases/accessories.
+BERTopic surfaces clean, interpretable themes — accessories (cases/clips), battery & charging, carrier unlocking, condition/refurbished, and more. Topics were evaluated by manual inspection (interactive 2-D topic map + word clouds), not a quantitative coherence metric.
 
-![Top2Vec topic word clouds](docs/01_top2vec_wordclouds.png)
+![BERTopic word cloud for one topic](docs/topic-word-cloud.png)
+![BERTopic intertopic distance map](docs/topic-distance-map.png)
 
-### BERTopic — Intertopic Distance Map *(interactive)*
-Each bubble is a topic, **sized by how many reviews it contains** and positioned by topic similarity (UMAP over the topic embeddings; inspired by LDAvis). In the notebook this is a live Plotly chart — hover a bubble for its top words and use the slider to isolate topics.
+### Rating classification
 
-![BERTopic intertopic distance map](docs/02_bertopic_distance_map.png)
+The fine-tuned BERT classifier decisively beats the bag-of-words baselines, especially on the hard, under-represented middle ratings (2–4★):
 
-### BERTopic — Documents & Topics *(interactive)*
-Every point is a single review, placed by its embedding and colored by assigned topic, with clusters annotated by auto-generated labels (e.g. `0_watch_band_wrist`, `22_sim_card_slot`, `25_battery_life_dies`). In the notebook you can hover any point to read the underlying review and zoom into dense regions.
+| Model | Precision | Recall | F1 (macro) |
+|-------|:---------:|:------:|:----------:|
+| Logistic Regression | 0.47 | 0.48 | 0.47 |
+| Naive Bayes | 0.51 | 0.37 | 0.33 |
+| **BERT classifier** | **0.86** | **0.85** | **0.85** |
 
-![BERTopic documents and topics](docs/04_bertopic_documents.png)
+![BERT classifier confusion matrix](docs/bert-confusion-matrix.png)
+![BERT classifier per-class report](docs/bert-classification-report.png)
 
-### From-scratch BERTopic — document clusters
-Review embeddings reduced to 2-D with UMAP and clustered with HDBSCAN in the manual implementation. Colored points are clustered reviews (one color per topic); gray points are HDBSCAN outliers.
-
-![From-scratch UMAP + HDBSCAN clusters](docs/03_fromscratch_clusters.png)
-
-> The interactive charts (distance map, documents) are static snapshots here — open `02_BERTopic_library.ipynb` to explore the live Plotly versions.
+> Because the ratings are imbalanced, **macro-F1** is the headline metric (it weights all five classes equally). The baselines collapse onto the two majority classes (NB scores F1 = 0.00 on 2★); BERT classifies the minority ratings far more reliably.
 
 ## Repository structure
 
 ```
 .
-├── 00_Preprocessing.ipynb           # Clean raw reviews → apple_preprocessed.csv
-├── 01_Top2Vec.ipynb                 # Approach 1: Top2Vec
-├── 02_BERTopic_library.ipynb        # Approach 2a: BERTopic via the library
-├── 03_BERTopic_from_scratch.ipynb   # Approach 2b: BERTopic reimplemented by hand
-├── apple.csv                        # Raw Amazon reviews (Apple products)
-├── apple_preprocessed.csv           # Cleaned corpus
-├── docs/                            # Figures used in this README
-└── experiments/                     # Earlier iterations / scratch notebooks
+├── 00_data_filtering.ipynb            # 10M Amazon reviews → 66k Apple
+├── 01_text_preprocessing.ipynb        # clean/filter → 50,813 reviews
+├── 02_topic_modeling_bertopic.ipynb   # BERTopic (30 topics)
+├── 03_classification_lr_nb.ipynb      # Logistic Regression + Naive Bayes baselines
+├── 04_classification_bert.ipynb       # fine-tuned BERT classifier (0.85 macro-F1)
+├── apple.csv                          # raw Apple reviews
+├── apple_text_preprocessed.csv        # cleaned corpus
+├── docs/                              # figures used in this README
+└── experiments/                       # exploratory alternatives (not in the paper)
+    ├── top2vec.ipynb                  # Top2Vec topic modelling
+    ├── bertopic_library.ipynb         # earlier BERTopic exploration
+    └── bertopic_from_scratch.ipynb    # BERTopic reimplemented by hand (UMAP→HDBSCAN→c-TF-IDF)
 ```
 
 ## Running
 
-The notebooks were developed in Google Colab. To run locally:
+Developed in Google Colab (GPU recommended; the BERT fine-tune takes ~4h on a single GPU). Locally:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -73,8 +80,12 @@ pip install -r requirements.txt
 jupyter lab
 ```
 
-Run `00_Preprocessing.ipynb` first to generate `apple_preprocessed.csv`, then any of the modeling notebooks. Embedding the full corpus benefits from a GPU.
+Run the notebooks in order (`00` → `04`); `02`–`04` read `apple_text_preprocessed.csv`.
+
+## Team
+
+Finn Feddersen, Elias Froholt, Vegard Gansmoe, Poul Nissen (supervisors: Rajani Singh, Sine Zambach, Daniel Hardt).
 
 ## Acknowledgements
 
-Built on [Top2Vec](https://github.com/ddangelov/Top2Vec) and [BERTopic](https://github.com/MaartenGr/BERTopic). Review data is a subset of the publicly available Amazon product review data filtered to Apple products.
+Built on [BERTopic](https://github.com/MaartenGr/BERTopic), [Hugging Face Transformers](https://github.com/huggingface/transformers), and scikit-learn. Review data: [Amazon Review Data (2018)](https://nijianmo.github.io/amazon/), Ni, Li & McAuley (UCSD).
